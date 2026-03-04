@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choose Color Temperature</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap" rel="stylesheet">
+</head>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-family: manrope;
+  }
+
+  input {
+    width: 300px;
+    color: white;
+    accent-color: black;
+  }
+
+  #value {
+    margin-top: 12px;
+    font-size: 20px;
+  }
+
+  .hidden {
+    display: none;
+  }
+</style>
+
+<body>
+  <h1>Choose Color Temperature</h1>
+  <input type="range" min="1000" max="6000" value="3000" id="slider">
+  <div id='value'></div>
+</body>
+<script>
+  const slider = document.getElementById("slider")
+
+  function kelvinToRGB(k) {
+
+    let temp = k / 100
+    let r, g, b
+
+    if (temp <= 66) {
+      r = 255
+      g = temp
+      g = 99.47 * Math.log(g) - 161.12
+      b = temp <= 19 ? 0 : 138.52 * Math.log(temp - 10) - 305.04
+    } else {
+      r = 329.7 * Math.pow(temp - 60, -0.133)
+      g = 288.12 * Math.pow(temp - 60, -0.0755)
+      b = 255
+    }
+
+    r = Math.min(255, Math.max(0, r))
+    g = Math.min(255, Math.max(0, g))
+    b = Math.min(255, Math.max(0, b))
+
+    return `rgb(${r},${g},${b})`
+  }
+
+  function update() {
+    const k = slider.value
+    document.body.style.background = kelvinToRGB(k)
+    document.getElementById('value').textContent = k + "K"
+  }
+
+  slider.addEventListener("input", update)
+  update()
+
+  let black = false
+
+  document.addEventListener("keydown", (event) => {
+
+    if (event.code === "Space") {
+
+      black = !black
+
+      if (black) {
+        document.body.style.background = "black"
+        document.getElementById("slider").classList.add("hidden")
+      } else {
+        document.getElementById("slider").classList.remove("hidden")
+        update()
+      }
+
+    }
+
+  })
+</script>
+
+</html>
