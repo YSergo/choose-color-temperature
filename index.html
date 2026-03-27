@@ -212,7 +212,28 @@
 
   let black = false
 
+  function toggleBlackout() {
+    black = !black
+
+    if (black) {
+      document.body.style.background = "black"
+      slider.classList.add("hidden")
+      hexValueEl.classList.add("hidden")
+      return
+    }
+
+    slider.classList.remove("hidden")
+    hexValueEl.classList.remove("hidden")
+    update()
+  }
+
   document.addEventListener("keydown", (event) => {
+    if (black) {
+      event.preventDefault()
+      toggleBlackout()
+      return
+    }
+
     if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
       event.preventDefault()
 
@@ -232,25 +253,22 @@
 
     if (event.code === "Space") {
       event.preventDefault()
-
-      black = !black
-
-      if (black) {
-        document.body.style.background = "black"
-        document.getElementById("slider").classList.add("hidden")
-        document.getElementById("hex-value").classList.add("hidden")
-      } else {
-        document.getElementById("slider").classList.remove("hidden")
-        document.getElementById("hex-value").classList.remove("hidden")
-        update()
-      }
-
+      toggleBlackout()
     }
 
     if (event.code === "KeyU") {
       event.preventDefault()
       app.classList.toggle("hidden")
     }
+  })
+
+  document.addEventListener("pointerdown", (event) => {
+    if (!black || event.pointerType !== "mouse") {
+      return
+    }
+
+    event.preventDefault()
+    toggleBlackout()
   })
 </script>
 
