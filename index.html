@@ -101,6 +101,15 @@
     font-size: 20px;
   }
 
+  #value:focus,
+  #value[contenteditable="plaintext-only"],
+  #color-codes code:focus,
+  #color-codes code[contenteditable="plaintext-only"] {
+    outline: none;
+    border: 0;
+    box-shadow: none;
+  }
+
   #color-codes {
     margin-top: 12px;
     display: grid;
@@ -162,6 +171,15 @@
   const slider = document.getElementById("slider")
   const valueEl = document.getElementById("value")
   const hexValueEl = document.getElementById("hex-value")
+  const editableFields = [valueEl, hexValueEl]
+  let activeEditableField = null
+
+  valueEl.tabIndex = 0
+  hexValueEl.tabIndex = 0
+  valueEl.setAttribute("role", "textbox")
+  hexValueEl.setAttribute("role", "textbox")
+  valueEl.setAttribute("aria-label", "Temperature in kelvin")
+  hexValueEl.setAttribute("aria-label", "Hex color value")
 
   function kelvinToRGB(k) {
 
@@ -197,6 +215,111 @@
       .toUpperCase()
   }
 
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value))
+  }
+
+  function isEditableTarget(target) {
+    return target instanceof HTMLElement && target.isContentEditable
+  }
+
+  function parseTemperatureInput(value) {
+    const normalized = value.replace(/k/gi, "").trim()
+    const nextTemperature = Number(normalized)
+
+    return Number.isFinite(nextTemperature) ? nextTemperature : Number.NaN
+  }
+
+  function parseHexInput(value) {
+    const normalized = value.trim().replace(/^#/, "")
+
+    if (!/^[\da-f]{6}$/i.test(normalized)) {
+      return null
+    }
+
+    return {
+      r: Number.parseInt(normalized.slice(0, 2), 16),
+      g: Number.parseInt(normalized.slice(2, 4), 16),
+      b: Number.parseInt(normalized.slice(4, 6), 16),
+    }
+  }
+
+  function findNearestTemperatureForRgb(targetRgb) {
+    const min = Number(slider.min)
+    const max = Number(slider.max)
+    let closestTemperature = min
+    let smallestDistance = Number.POSITIVE_INFINITY
+
+    for (let temperature = min; temperature <= max; temperature += 1) {
+      const rgb = kelvinToRGB(temperature)
+      const distance = (
+        (rgb.r - targetRgb.r) ** 2 +
+        (rgb.g - targetRgb.g) ** 2 +
+        (rgb.b - targetRgb.b) ** 2
+      )
+
+      if (distance < smallestDistance) {
+        smallestDistance = distance
+        closestTemperature = temperature
+      }
+    }
+
+    return closestTemperature
+  }
+
+  function focusEditableField(field) {
+    activeEditableField = field
+    field.dataset.previousValue = field.textContent ?? ""
+    field.contentEditable = "plaintext-only"
+
+    const selection = window.getSelection()
+    const range = document.createRange()
+
+    range.selectNodeContents(field)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+  }
+
+  function stopEditingField(field, { commit = true } = {}) {
+    if (!field.isContentEditable) {
+      return
+    }
+
+    const rawValue = field.textContent ?? ""
+    field.contentEditable = "false"
+    activeEditableField = null
+
+    if (!commit) {
+      update()
+      return
+    }
+
+    if (field === valueEl) {
+      const nextTemperature = parseTemperatureInput(rawValue)
+
+      if (Number.isFinite(nextTemperature)) {
+        slider.value = clamp(
+          Math.round(nextTemperature),
+          Number(slider.min),
+          Number(slider.max),
+        ).toString()
+      }
+
+      update()
+      return
+    }
+
+    if (field === hexValueEl) {
+      const rgb = parseHexInput(rawValue)
+
+      if (rgb) {
+        slider.value = findNearestTemperatureForRgb(rgb).toString()
+      }
+
+      update()
+    }
+  }
+
   function update() {
     const k = slider.value
     const rgb = kelvinToRGB(k)
@@ -209,6 +332,54 @@
 
   slider.addEventListener("input", update)
   update()
+
+  editableFields.forEach((field) => {
+    field.addEventListener("click", () => {
+      if (field.isContentEditable) {
+        return
+      }
+
+      focusEditableField(field)
+    })
+
+    field.addEventListener("focus", () => {
+      if (field.isContentEditable) {
+        return
+      }
+
+      focusEditableField(field)
+    })
+
+    field.addEventListener("blur", () => {
+      stopEditingField(field)
+    })
+
+    field.addEventListener("keydown", (event) => {
+      if (event.code === "Enter") {
+        event.preventDefault()
+        stopEditingField(field)
+        field.blur()
+        return
+      }
+
+      if (event.code === "Escape") {
+        event.preventDefault()
+        stopEditingField(field, { commit: false })
+        field.blur()
+      }
+    })
+
+    field.addEventListener("paste", (event) => {
+      const pastedText = event.clipboardData?.getData("text/plain")
+
+      if (!pastedText) {
+        return
+      }
+
+      event.preventDefault()
+      field.textContent = pastedText.trim()
+    })
+  })
 
   let black = false
 
@@ -228,6 +399,10 @@
   }
 
   document.addEventListener("keydown", (event) => {
+    if (isEditableTarget(event.target)) {
+      return
+    }
+
     if (black) {
       event.preventDefault()
       toggleBlackout()
@@ -237,7 +412,7 @@
     if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
       event.preventDefault()
 
-      const direction = event.code === "ArrowRight" ? 1000 : -1000
+      const direction = event.code === "ArrowRight" ? 100 : -100
       const nextValue = Number(slider.value) + direction
       const min = Number(slider.min)
       const max = Number(slider.max)
